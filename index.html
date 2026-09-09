@@ -132,6 +132,32 @@
     text-decoration:underline; font-weight:500;
   }
 
+  /* radar pulse + hint bubble on the landing search field */
+  @keyframes radarPulse{
+    0%{ transform:scale(1); opacity:.55; }
+    100%{ transform:scale(1.12); opacity:0; }
+  }
+  .search-box.pulsing{position:relative;}
+  .search-box.pulsing::before, .search-box.pulsing::after{
+    content:''; position:absolute; inset:0; border-radius:var(--radius);
+    border:4px solid var(--purple); pointer-events:none;
+    animation:radarPulse 2.4s ease-out infinite;
+  }
+  .search-box.pulsing::after{animation-delay:1.2s;}
+  @keyframes hintBob{
+    0%,100%{transform:translateY(0);}
+    50%{transform:translateY(-4px);}
+  }
+  .search-hint-bubble{
+    position:absolute; left:6px; bottom:calc(100% + 14px); background:#000; color:var(--white);
+    font-size:12.5px; font-weight:500; padding:9px 15px; border-radius:8px; white-space:nowrap;
+    box-shadow:0 8px 18px rgba(0,0,0,.32); animation:hintBob 1.7s ease-in-out infinite; z-index:2;
+  }
+  .search-hint-bubble::after{
+    content:''; position:absolute; top:100%; left:22px; width:11px; height:11px;
+    background:#000; transform:rotate(45deg); margin-top:-5px;
+  }
+
   .search-meta{
     display:flex; align-items:center; gap:16px; margin:18px 0 24px; font-size:13.5px; color:var(--gray-500);
   }
@@ -530,6 +556,7 @@ let stack = []; // drawer screen stack
 let currentView = 'landing'; // landing | linha | conta
 let mainHistory = []; // history stack for the main (non-drawer) page navigation
 let landingMode = 'linha'; // linha | conta — toggle on the landing page
+let hasInteractedSearch = false; // controls the radar-pulse hint on the home search field
 let contaFilters = {ativa:true, inativa:true, bloqueada:true};
 
 /* ============================================================
@@ -591,6 +618,14 @@ function goBackMain(){
 function backNav(){
   return `<button class="back-nav" id="backNavBtn">${ICON.arrowLeft} Voltar</button>`;
 }
+function dismissSearchHint(){
+  if(hasInteractedSearch) return;
+  hasInteractedSearch = true;
+  const box = document.getElementById('mainSearchBox');
+  if(box) box.classList.remove('pulsing');
+  const bubble = document.querySelector('.search-hint-bubble');
+  if(bubble) bubble.remove();
+}
 
 function renderLanding(){
   mainEl.innerHTML = `
@@ -600,7 +635,8 @@ function renderLanding(){
       <label class="radio-inline"><input type="radio" name="landingMode" id="landingModeLinha" ${landingMode==='linha'?'checked':''}> Linha</label>
       <label class="radio-inline"><input type="radio" name="landingMode" id="landingModeConta" ${landingMode==='conta'?'checked':''}> Conta</label>
     </div>
-    <div class="search-box">
+    <div class="search-box${hasInteractedSearch ? '' : ' pulsing'}" id="mainSearchBox">
+      ${hasInteractedSearch ? '' : `<div class="search-hint-bubble">👇 Toque aqui e experimente!</div>`}
       <div class="search-field">
         <label for="searchInput">${landingMode==='conta'?'Busque pelo número da conta':'Busque pelo número da linha com DDD'}</label>
         <input type="text" id="searchInput">
@@ -617,10 +653,12 @@ function renderLanding(){
     </div>`;
   document.getElementById('landingModeLinha').onchange = () => { landingMode='linha'; renderLanding(); };
   document.getElementById('landingModeConta').onchange = () => { landingMode='conta'; renderLanding(); };
-  document.getElementById('searchBtn').onclick = () => withLoading(document.getElementById('searchBtn'), doSearch, {variant:'dark', delay:500});
-  document.getElementById('searchInput').addEventListener('keydown', e=>{ if(e.key==='Enter') withLoading(document.getElementById('searchBtn'), doSearch, {variant:'dark', delay:500}); });
+  document.getElementById('searchBtn').onclick = () => { dismissSearchHint(); withLoading(document.getElementById('searchBtn'), doSearch, {variant:'dark', delay:500}); };
+  document.getElementById('searchInput').addEventListener('focus', dismissSearchHint);
+  document.getElementById('searchInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ dismissSearchHint(); withLoading(document.getElementById('searchBtn'), doSearch, {variant:'dark', delay:500}); } });
   mainEl.querySelectorAll('.search-hints button').forEach(b=>{
     b.onclick = () => {
+      dismissSearchHint();
       landingMode = b.dataset.mode; renderLanding();
       document.getElementById('searchInput').value = b.dataset.q;
       withLoading(document.getElementById('searchBtn'), doSearch, {variant:'dark', delay:500});
